@@ -382,7 +382,6 @@ def _(
     MathTex,
     RED,
     RIGHT,
-    ReplacementTransform,
     Scene,
     Text,
     Transform,
@@ -392,20 +391,23 @@ def _(
     UR,
     VGroup,
     Write,
-    YELLOW_E,
+    YELLOW_A,
 ):
     class ProbabilityDerivation(Scene):
         def construct(self):
             non_var_color = GRAY_C
             t2cD = {
                 r"\int": GRAY_B,
-                r"\mathbf{1}": YELLOW_E,
+                r"\mathbf{1}": YELLOW_A,
+                r"\mathbb{P}": non_var_color,
                 r"\mathbb{E}": non_var_color,
                 r"\bigg(": non_var_color,
                 r"\bigg)": non_var_color,
                 r"\bigg)^": non_var_color,
                 r"\Big]": non_var_color,
                 r"\Big[": non_var_color,
+                r"\Big)": non_var_color,
+                r"\Big(": non_var_color,
                 r"\{": GRAY_B,
                 r"\}": GRAY_B,
                 r"{n}": BLUE,
@@ -526,7 +528,6 @@ def _(
                 r"\bigg)^{n}",
                 **kwargs,
             )
-            print(*enumerate(lines[5]), sep="\n")
             # Transition 5 -> 6: Substitution/Scaling
             key_maps[5] = {
                 r"^1": r"^{\sqrt{2",
@@ -582,7 +583,6 @@ def _(
                 **kwargs,
             )
 
-            print(*enumerate(lines[6]), sep="\n")
             # Transition 6 -> 7: Changing limit of integration
             key_maps[6] = {r"=": r"\le", r"^{\sqrt{2\lambda}}": r"^{\infty}"}
             new_line[6] = False
@@ -612,7 +612,7 @@ def _(
             )
             # Transition 7 -> 8: Symmetry (0 to inf becomes 1/2 of -inf to inf)
             key_maps[7] = {r"\le": r"=", r"_0": r"_{-\infty}"}
-            new_line[7] = False
+            new_line[7] = True
 
             # --- STEP 8 ---
             lines[8] = MathTex(
@@ -691,14 +691,14 @@ def _(
             )
             # Transition 10 -> 11: Plugging in optimal lambda = {n}/2
             key_maps[11] = {
-                r"e^{\lambda}": r"e^{{n}/2}",
-                r"\lambda}": r"{n}/2}",
+                r"=": r"\le",
+                r"\lambda": r"{n}",
             }
             new_line[10] = True
 
             # --- STEP 11 --- Plug in lambda = {n}/2
             lines[11] = MathTex(
-                r"=",
+                r"\le",
                 r"{e}^{{n}/2}",
                 r"\bigg(",
                 r"{\frac{1}{2}}",
@@ -713,24 +713,25 @@ def _(
                 r"\bigg)^{n}",
                 **kwargs,
             )
-
-            new_line[11] = True
+            print(*enumerate(lines[11]), sep="\n")
+            new_line[11] = False
 
             key_maps[11] = {
                 # Base e with power {n}/2 moves into the second fraction
-                r"{e}^": r" e",
+                r"{e}^{": r"{ e }",
                 r"{\frac{1}{2}}": r"2",
-                # The outer brackets change size/type
+                r"\sqrt{": r"/2}",
                 r"\pi}": r"\pi",
+                # The outer brackets change size/type
             }
 
             # --- STEP 12 ---
             lines[12] = MathTex(
-                r"=",
+                r"\le",
                 r"\bigg(",
                 r"{",
-                r"\pi"
-                r" e",
+                r"{ e }",
+                r"\pi",
                 r"\over",
                 r"2",
                 r"{n}",
@@ -739,8 +740,12 @@ def _(
                 **kwargs,
             )
 
+            print(*enumerate(lines[12]), sep="\n")
+
             # --- ANIMATION EXECUTION ---
-            lhs = MathTex(r"\mathbb{P}(X_1^2+\dots+X^2_n \le 1)", **kwargs)
+            lhs = MathTex(
+                r"\mathbb{P}\Big( {X_1^2+\dots+X^2_n} \le 1 \Big)", **kwargs
+            )
             lhs.to_corner(UL, buff=1)
             lines[0].next_to(lhs, RIGHT, buff=0.2)
 
@@ -748,7 +753,7 @@ def _(
             self.play(Write(lines[0]))
             self.wait()
 
-            all_on_screen = VGroup(lhs, lines[0])
+            all_on_screen = VGroup(lines[0])  # lhs,
             current_rhs = lines[0]
 
             index_mob = Text("0").to_corner(UR)
@@ -757,49 +762,48 @@ def _(
             for i in range(len(lines) - 1):
                 next_index = Text(f"{i + 1}").to_corner(UR)
                 next_line = lines[i + 1]
-                if i == 50:
-                    lines_6_temp.move_to(current_rhs, aligned_edge=LEFT)
-                    self.play(ReplacementTransform(current_rhs, lines_6_temp))
-                    lines[6].move_to(current_rhs, aligned_edge=LEFT)
-                    current_rhs = lines[6]
-                    self.remove(lines_6_temp)
-                    self.add(current_rhs)
-                else:
-                    if new_line[i]:
+                if new_line[i]:  # True
+                    next_line.next_to(
+                        current_rhs, DOWN, aligned_edge=LEFT, buff=0.4
+                    )
+                    if next_line.get_bottom()[1] < -3.5:
+                        self.play(
+                            all_on_screen.animate.shift(
+                                UP * (next_line.get_height())
+                            )
+                        )
                         next_line.next_to(
                             current_rhs, DOWN, aligned_edge=LEFT, buff=0.4
                         )
-                        if next_line.get_bottom()[1] < -3.5:
-                            self.play(all_on_screen.animate.shift(UP * 3.0))
 
-                        self.play(
-                            TransformMatchingTex(
-                                current_rhs.copy(),
-                                next_line,
-                                key_map=key_maps[i],
-                                transform_mismatches=False,
-                                fade_transform_mismatches=False,
-                            ),
-                            Transform(index_mob, next_index),
-                        )
+                    self.play(
+                        TransformMatchingTex(
+                            current_rhs.copy(),
+                            next_line,
+                            key_map=key_maps[i],
+                            transform_mismatches=False,
+                            fade_transform_mismatches=False,
+                        ),
+                        Transform(index_mob, next_index),
+                    )
 
-                        all_on_screen.add(next_line)
-                        current_rhs = next_line
-                    else:
-                        next_line.move_to(current_rhs, aligned_edge=LEFT)
-                        self.play(
-                            TransformMatchingTex(
-                                current_rhs,
-                                next_line,
-                                key_map=key_maps[i],
-                                transform_mismatches=False,
-                                fade_transform_mismatches=False,
-                            ),
-                            Transform(index_mob, next_index),
-                        )
-                        all_on_screen.remove(current_rhs)
-                        all_on_screen.add(next_line)
-                        current_rhs = next_line
+                    all_on_screen.add(next_line)
+                    current_rhs = next_line
+                else:
+                    next_line.move_to(current_rhs, aligned_edge=LEFT)
+                    self.play(
+                        TransformMatchingTex(
+                            current_rhs,
+                            next_line,
+                            key_map=key_maps[i],
+                            transform_mismatches=False,
+                            fade_transform_mismatches=False,
+                        ),
+                        Transform(index_mob, next_index),
+                    )
+                    all_on_screen.remove(current_rhs)
+                    all_on_screen.add(next_line)
+                    current_rhs = next_line
                 self.wait(0.5)
 
             self.wait(3)
