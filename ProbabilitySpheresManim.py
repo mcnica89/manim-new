@@ -5,7 +5,7 @@ app = marimo.App(width="medium")
 
 
 @app.cell
-def _():
+def _(config):
     import marimo as mo
     from manim_slides import Slide
     import manim
@@ -17,7 +17,21 @@ def _():
     for name in dir(manim):
         if not name.startswith("_"):
             globals()[name] = getattr(manim, name)
-    return Slide, manim, mo, name, np
+
+    config.quality = "low_quality"
+    config.media_dir = "media"
+    config.verbosity = "WARNING"
+    config.progress_bar = "display"
+
+
+    def render_scene(which_scene):
+        scene = which_scene
+        scene.render()
+
+        # This dynamically retrieves the path to the movie file
+        # that Manim just generated!
+        return scene.renderer.file_writer.movie_file_path
+    return Slide, manim, mo, name, np, render_scene
 
 
 @app.cell
@@ -25,26 +39,25 @@ def _(
     Axes,
     BLUE,
     BarChart,
+    BraceBetweenPoints,
     Create,
     DOWN,
     DashedLine,
-    FunctionGraph,
+    GRAY_B,
     GREEN,
     LEFT,
     MathTex,
-    PURPLE,
     RED,
     RIGHT,
-    Slide,
+    Scene,
     Transform,
     UL,
     UP,
     VGroup,
     Write,
     YELLOW,
-    ZoomedScene,
+    YELLOW_A,
     np,
-    truncated_normal_distribution,
 ):
     # Global parameters
     n = 10  # Number of dimensions
@@ -59,27 +72,47 @@ def _(
     # Global dictionary for TeX to color mapping
 
     n_color = BLUE
-    t2cD = {"R": RED, "n": n_color, "{1}": n_color, "{2}": n_color, "X": GREEN}
+    non_var_color = GRAY_B
+    t2cD = {
+        r"R": RED,
+        r"{n}": n_color,
+        r"{1}": n_color,
+        r"{2}": n_color,
+        r"Z": YELLOW,
+        r"X": GREEN,
+        r"\int": GRAY_B,
+        r"\mathbf{1}": YELLOW_A,
+        r"\mathbb{P}": non_var_color,
+        r"\mathbb{E}": non_var_color,
+        r"\bigg(": non_var_color,
+        r"\bigg)": non_var_color,
+        r"\bigg)^": non_var_color,
+        r"\Big]": non_var_color,
+        r"\Big[": non_var_color,
+        r"\Big)": non_var_color,
+        r"\Big(": non_var_color,
+    }
 
     my_zoom_scale_factor = 4
 
 
-    class ProbabilitySpheres(ZoomedScene, Slide):
-        def __init__(self, **kwargs):
-            ZoomedScene.__init__(
-                self,
-                zoomed_display_corner=np.array([-1, 1, 0.0]),
-                zoom_factor=0.3,
-                zoomed_display_height=16 / my_zoom_scale_factor,
-                zoomed_display_width=16 / my_zoom_scale_factor,
-                zoomed_camera_config={
-                    "default_frame_stroke_width": 3,
-                },
-                **kwargs,
-            )
+    class ProbabilitySpheres(Scene):  # (ZoomedScene, Slide):
+        # def __init__(self, **kwargs):
+        #    ZoomedScene.__init__(
+        #        self,
+        #        zoomed_display_corner=np.array([-1, 1, 0.0]),
+        #        zoom_factor=0.3,
+        #        zoomed_display_height=16 / my_zoom_scale_factor,
+        #        zoomed_display_width=16 / my_zoom_scale_factor,
+        #        zoomed_camera_config={
+        #            "default_frame_stroke_width": 3,
+        #        },
+        #        **kwargs,
+        #    )
 
         def pause(self):
-            self.next_slide()
+            self.wait(0.1)
+            # self.next_slide()
 
         def construct(self):
             print("Constructing...")
@@ -89,7 +122,7 @@ def _(
             self.next_section(skip_animations=True)
 
             def my_hist_values(_samples):
-                hist_values = np.zeros(N_bins - 1)
+                hist_values = np.zeros(N_bins)
                 for sample in _samples:
                     bin_index = np.digitize(sample, bins) - 1
                     bin_index = min(bin_index, len(hist_values) - 1)
@@ -98,6 +131,9 @@ def _(
 
             complete_hist_values = my_hist_values(samples)
             max_hist_value = np.max(complete_hist_values)
+
+            HIST_HEIGHT = 4.5
+            HIST_WIDTH = 8
 
             def my_bar_chart(_hist_values):
                 low_color = RED
@@ -109,8 +145,8 @@ def _(
                         low_color if i < bins_per_unit else high_color
                         for i in range(N_bins - 1)
                     ],
-                    y_length=4.5,
-                    x_length=8,
+                    y_length=HIST_HEIGHT,
+                    x_length=HIST_WIDTH,
                     x_axis_config={"font_size": 24},
                     y_axis_config={"font_size": 1},
                 )
@@ -118,7 +154,7 @@ def _(
                 chart.to_edge(UP, buff=1.0)
                 return chart
 
-            hist_values = np.zeros(N_bins - 1)
+            hist_values = np.zeros(N_bins)
             bar_chart = my_bar_chart(hist_values)
 
             # Create and add text objects for the initial display
@@ -134,13 +170,13 @@ def _(
                 + DOWN * down_len
             )
             label_right = MathTex(
-                r"n", tex_to_color_map=t2cD, font_size=label_fs
+                r"{n}", tex_to_color_map=t2cD, font_size=label_fs
             ).move_to(bar_chart.bars[-1].get_center() + DOWN * down_len)
             label_mid = MathTex(
                 r"{n}/2", tex_to_color_map=t2cD, font_size=label_fs
             ).move_to(bar_chart.bars[N_bins // 2].get_center() + DOWN * down_len)
             label = MathTex(
-                r"\text{Histogram of } R^2 = X^2_{1} + X^2_{2} + \ldots + X^2_n",
+                r"\text{Histogram of } X^2_{1} + X^2_{2} + \ldots + X^2_{n}",
                 tex_to_color_map=t2cD,
             ).next_to(bar_chart, UP)
 
@@ -168,8 +204,6 @@ def _(
                     .next_to(label, DOWN)
                     .align_to(label, RIGHT)
                 )
-
-            self.next_section()
 
             samples_label = my_samples_label(0)
             self.play(Write(samples_label))
@@ -232,9 +266,9 @@ def _(
             # )
 
             n_over_3_label = MathTex(
-                r"n/3", tex_to_color_map=t2cD, font_size=label_fs
+                r"{n}/3", tex_to_color_map=t2cD, font_size=label_fs
             ).next_to(dashed_line, DOWN, buff=0)
-            n_over_3_label.shift(DOWN * down_len)
+            n_over_3_label.shift(DOWN * 0.1)
 
             # Create and animate the dashed line with label
             LLN_label_1 = MathTex(
@@ -243,100 +277,200 @@ def _(
                 font_size=label_fs,
             )
             LLN_label_2 = MathTex(
-                r"{R^2 \over",
-                r"n",
-                r"}",
+                r"{{ X^2_{1} + \ldots + X^2_{n} }",
+                r"\approx",
+                r"{n}",
+                r"\mathbb{E}",
+                r"\Big[",
+                r"X",
+                r"^2",
+                r"\Big]",
                 r"=",
-                r"{{ X^2_{1} + \ldots + X^2_n }",
-                r"\over",
-                r"n",
-                r"}",
-                r"\to",
+                r"{n}",
                 r"{1 \over 3}",
                 tex_to_color_map=t2cD,
                 font_size=label_fs,
             )
-            LLN_label = (
-                VGroup(LLN_label_1, LLN_label_2).arrange(DOWN).to_corner(UL)
+
+            LLN_eqn = MathTex(
+                r"\mathbb{E}",
+                r"\Big[",
+                r"X",
+                r"^2",
+                r"\Big]",
+                r"=",
+                r"\int",
+                r"_{-1}",
+                r"^1",
+                r"{x^2 \over 2}",
+                r"dx",
+                r"={",
+                r"1 \over 3}",
+                tex_to_color_map=t2cD,
+                font_size=label_fs,
             )
 
+            my_buff = 0.3
+            LLN_label = (
+                VGroup(LLN_label_1, LLN_label_2)
+                .arrange(DOWN)
+                .to_corner(UL, buff=my_buff)
+            )
+
+            LLN_eqn.next_to(LLN_label, DOWN).align_to(LLN_label, LEFT)
+
             self.play(
-                Create(dashed_line), Write(n_over_3_label), Write(LLN_label)
+                Create(dashed_line), Write(n_over_3_label)
             )  # Create and animate the dashed line with label
+            self.pause()
 
-            std_dev = 0.1
+            self.play(Write(LLN_label_1))
+            self.play(Write(LLN_label_2[:-3]))
+            self.pause()
 
-            # Define the parameters
-            HIST_WIDTH = 8
-            HIST_HEIGHT = 4.5
-            HIST_COLOR = HIST_LEFT_COLOR = RED
-            HIST_RIGHT_COLOR = BLUE
-            bell_curve_max_x = n / 3  # Center it at the expected value
+            self.play(Transform(LLN_label_2[-8:-3].copy(), LLN_eqn[0:5]))
+            self.play(Write(LLN_eqn[5:]))
+            self.pause()
 
-            # Create new axes
+            self.play(Transform(LLN_eqn[-2:].copy(), LLN_label_2[-3:]))
+            self.pause()
+
             ax = Axes(
-                x_range=[0, n, n / 2],
-                y_range=[0, max_hist_value, max_hist_value / 2],
+                x_range=[0, n, 0.1],
+                y_range=[0, 1, 0.1],
                 tips=False,
                 x_length=HIST_WIDTH,
                 y_length=HIST_HEIGHT,
                 axis_config={"include_numbers": False},
             )
 
-            # Define the normal distribution really modified to match histogram
-            def normal_distribution(x, mean, std_dev, height):
-                norm_factor = height / (std_dev * np.sqrt(2 * np.pi))
-                exponent = -((x - mean) ** 2) / (2 * std_dev**2)
-                return norm_factor * np.exp(exponent)
+            # x_min must be > 0 because log is undefined at 0.
+            HIST_COLOR = GREEN
+            Z_COLOR = YELLOW
+            # Make the Bell curve
 
-            # Plot the normal distribution
-            graph = ax.plot(
-                lambda x: normal_distribution(
-                    x, bell_curve_max_x, std_dev, max_hist_value
-                ),
+            off_x = (max_bin_index + 0.5 + 0.25) / bins_per_unit
+
+            sanity_plot = ax.plot(
+                lambda x: np.exp(-((x - off_x) ** 2)),
                 x_range=[0, n],
-                color=PURPLE,
-                use_smoothing=True,
+                color=HIST_COLOR,
             )
 
-            # Overlap the axes, bars, and bell curve
-            # chart = my_bar_chart(hist_values)
-            # chart.move_to(ax.c2p(0, 0))
-            ax.align_to(bar_chart.y_axis, LEFT).align_to(bar_chart.x_axis, DOWN)
-            graph.align_to(bar_chart.y_axis, LEFT).align_to(bar_chart.x_axis, DOWN)
-            self.play(Create(graph))
+            graph = ax.plot(
+                lambda x: (1 + 0.07 * ((x - off_x) ** 3 - 3 * (x - off_x)))
+                * np.exp(-((x - off_x) ** 2) / (2 * 4 / 45 * n)),
+                x_range=[0, n],
+                stroke_width=5,
+                color=Z_COLOR,
+                use_smoothing=True,
+                stroke_opacity=0.65,
+            )
+            area = ax.get_area(
+                graph,
+                x_range=(0, n),
+                color=Z_COLOR,  # HIST_COLOR,
+                opacity=0.1,
+            )
+            graph.height = sanity_plot.height
+            area.height = sanity_plot.height
+            # BELL_CURVE = VGroup(ax, graph, area)
+            VGroup(graph, area).align_to(bar_chart, UP).align_to(bar_chart, RIGHT)
+
+            # ax, graph, area = BELL_CURVE
+            self.play(Create(graph))  # FadeIn(area),
+            self.pause()
+
+            # Create and animate the dashed line with label
+            CLT_label_1 = MathTex(
+                r"\text{Central Limit Theorem:}",
+                tex_to_color_map=t2cD,
+                font_size=label_fs,
+            )
+            CLT_label_2 = MathTex(
+                r"{{ X^2_{1} + \ldots + X^2_{n} }",
+                r"\approx",
+                r"{n}",
+                r"{1 \over 3}",
+                r"\! + \!",
+                r"\sqrt{ {n} }"
+                r"\frac{ 2 }{ 3 \sqrt{5} }",
+                r"Z",
+                tex_to_color_map=t2cD,
+                font_size=label_fs,
+            )
+
+            CLT_label = (
+                VGroup(CLT_label_1, CLT_label_2)
+                .arrange(DOWN)
+                .next_to(LLN_eqn, DOWN)
+                .to_edge(LEFT, buff=my_buff)
+            )
+
+            self.play(Write(CLT_label_1))
+            self.play(Write(CLT_label_2))
+            self.pause()
+
+            self.next_section()
+
+            # Code to add the additional x-axis labels and underbrace
+            offset = 0.3  # Adjust this as necessary for positioning the labels
+
+            shift_amount = (
+                np.sqrt(n) * 2 / 3 / np.sqrt(5)
+            )  # Adjust this value to control the horizontal distance of the braces
+
+            my_pos = n_over_3_label.get_bottom() + 0.1 * UP
+            sqrt_n_term = r"\sqrt{ {n} } \frac{ 2 }{ 3 \sqrt{5} }"
+            # Compute new positions for braces using a horizontal shift from the n/3 position
+            right_brace_end = my_pos + np.array([shift_amount, 0, 0])
+            left_brace_start = my_pos + np.array([-shift_amount, 0, 0])
+
+            # Create the two braces with adjusted positions
+            brace_color = YELLOW
+            brace_dir = DOWN
+
+            brace_right = BraceBetweenPoints(
+                my_pos + 0.04 * RIGHT,
+                right_brace_end,
+                brace_dir,
+                color=brace_color,
+            )
+            brace_left = BraceBetweenPoints(
+                left_brace_start,
+                my_pos + 0.04 * LEFT,
+                brace_dir,
+                color=brace_color,
+            )
+
+            # Create text labels using MathTex with tex_to_color_map
+            my_fs = 24
+            brace_text_right = MathTex(
+                r"+1 \text{ SD}",
+                tex_to_color_map=t2cD,
+                font_size=my_fs,
+                color=brace_color,
+            )
+            brace_text_left = MathTex(
+                r"-1 \text{ SD}",
+                tex_to_color_map=t2cD,
+                font_size=my_fs,
+                color=brace_color,
+            )
+
+            # Position the text labels at the center of the braces
+            brace_text_right.next_to(brace_right, brace_dir, buff=0.1)
+            brace_text_left.next_to(brace_left, brace_dir, buff=0.1)
+
+            self.play(Create(brace_right), Write(brace_text_right))
+            self.play(Create(brace_left), Write(brace_text_left))
+
+            # Resuming the existing construct flow
+            self.pause()
 
             self.wait(2)
 
             return 0
-            # Calculate the mean position on the x-axis in terms of the histogram's axis
-            x_axis = bar_chart.x_axis
-            mean_position = x_axis.number_to_point(max_bin_index + 0.5)[
-                0
-            ]  # Centered at the dotted line
-
-            # Ensure the height of the normal distribution matches with y-axis
-            y_axis_scale_factor = (
-                y_axis.number_to_point(1)[1] - y_axis.number_to_point(0)[1]
-            )  # Scale factor for y-axis
-            normal_curve = FunctionGraph(
-                lambda x: truncated_normal_distribution(
-                    x, mean_position, std_dev, max_hist_value * y_axis_scale_factor
-                ),
-                x_range=[0, n],  # Truncated between 0 and n
-                color=PURPLE,
-            )
-
-            # Position and transform the graph to align with the histogram's axes
-            # normal_curve.stretch_to_fit_height(max_hist_value * y_axis_scale_factor)
-            # normal_curve.move_to(np.array_axis.number_to_point(0))
-            normal_curve.align_to(bar_chart.y_axis, DOWN).align_to(
-                bar_chart.x_axis, LEFT
-            )
-
-            # Add the normal distribution to the scene
-            self.play(Create(normal_curve), run_time=2)
-            self.pause()
 
             return 0
             self.next_section()
@@ -361,17 +495,20 @@ def _(
         my_zoom_scale_factor,
         n,
         n_color,
+        non_var_color,
         samples,
         t2cD,
     )
 
 
 @app.cell
-def _():
+def _(ProbabilitySpheres, mo, render_scene):
+    _video_path = render_scene(ProbabilitySpheres())
+    mo.video(_video_path, loop=True, controls=True, autoplay=True)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     BLUE,
     DOWN,
@@ -380,6 +517,7 @@ def _(
     GREEN,
     LEFT,
     MathTex,
+    PI,
     RED,
     RIGHT,
     Scene,
@@ -395,7 +533,9 @@ def _(
 ):
     class ProbabilityDerivation(Scene):
         def construct(self):
-            non_var_color = GRAY_C
+            non_var_color = GRAY_B
+            n_color = BLUE
+            lambda_color = RED
             t2cD = {
                 r"\int": GRAY_B,
                 r"\mathbf{1}": YELLOW_A,
@@ -408,19 +548,42 @@ def _(
                 r"\Big[": non_var_color,
                 r"\Big)": non_var_color,
                 r"\Big(": non_var_color,
-                r"\{": GRAY_B,
-                r"\}": GRAY_B,
-                r"{n}": BLUE,
-                r"\lambda": RED,
-                r"(X_1^2+\dots+X^2_n)": GREEN,
-                r"{X_1^2+\dots+X^2_n}": GREEN,
+                r"\{": GRAY_C,
+                r"\}": GRAY_C,
+                r"{n}": n_color,
+                r"{ n }": n_color,
+                r"{  n  }": n_color,
+                r"{\lambda}": lambda_color,
+                r"{ \lambda }": lambda_color,
+                r"(X_1^2+\dots+X^2_{n})": GREEN,
+                r"{X_1^2+\dots+X^2_{n}}": GREEN,
             }
+
+            explanation_kwargs = {"font_size": 32}
             kwargs = {"font_size": 40, "tex_to_color_map": t2cD}
-            num_steps = 13
+            num_steps = 12
 
             lines = [None] * num_steps
             key_maps = [None] * (num_steps - 1)
             new_line = [None] * (num_steps - 1)
+            explanation = [None] * (num_steps)
+
+            # --- ANIMATION EXECUTION ---
+            lhs = MathTex(
+                r"\mathbb{P}",
+                r"\Big(",
+                r"{X_1^2+\dots+X^2_{n}}",
+                r"{\le}",
+                r"1",
+                r"\Big)",
+                **kwargs,
+            )
+
+            lhs_keymap = {
+                r"\mathbb{P}": r"\mathbb{E}",
+                r"\Big(": r"\Big[",
+                r"\Big)": r"\Big]",
+            }
 
             # --- STEP 0 ---
             lines[0] = MathTex(
@@ -428,7 +591,13 @@ def _(
                 r"\mathbb{E}",
                 r"\Big[",
                 r"\mathbf{1}",
-                r"_{\{ {X_1^2+\dots+X^2_n} \le 1\}}",
+                r"_{",
+                r"\{",
+                r"{X_1^2+\dots+X^2_{n}}",
+                r"{\le}",
+                r"1",
+                r"\}",
+                r"}",
                 r"\Big]",
                 **kwargs,
             )
@@ -443,11 +612,17 @@ def _(
                 r"\mathbb{E}",
                 r"\Big[",
                 r"\mathbf{1}",
-                r"_{\{ {X_1^2+\dots+X^2_n} \le 1\}}",
+                r"_{",
+                r"\{",
+                r"{X_1^2+\dots+X^2_{n}}",
+                r"{\le}",
+                r"1",
+                r"\}",
+                r"}",
                 r"{",
                 r"{e}^{\lambda}",
                 r"\over",
-                r"e^{\lambda(X_1^2+\dots+X^2_n)}",
+                r"e^{{\lambda}(X_1^2+\dots+X^2_{n})}",
                 r"}",
                 r"\Big]",
                 **kwargs,
@@ -464,7 +639,7 @@ def _(
                 r"{",
                 r"{e}^{\lambda}",
                 r"\over",
-                r"e^{\lambda(X_1^2+\dots+X^2_n)}",
+                r"e^{{\lambda}(X_1^2+\dots+X^2_{n})}",
                 r"}",
                 r"\Big]",
                 **kwargs,
@@ -472,6 +647,14 @@ def _(
             # Transition 2 -> 3: Fraction collapses into exponential with negative power
             key_maps[2] = {r"\le": r"=", r"e^{": r"e^{-"}
             new_line[2] = True
+            # explanation[2] = VGroup(
+            #    MathTex(r"(\text{``Exponential }", **explanation_kwargs),
+            # MathTex(r"\text{Chebyshev Inequality''})", **explanation_kwargs),
+            #       ).arrange(DOWN)
+
+            explanation[2] = MathTex(
+                r"\text{``Exponential Chebyshev Inequality''}", font_size=28
+            )
 
             # --- STEP 3 ---
             lines[3] = MathTex(
@@ -479,13 +662,13 @@ def _(
                 r"{e}^{\lambda}",
                 r"\mathbb{E}",
                 r"\Big[",
-                r"e^{-\lambda(X_1^2+\dots+X^2_n)}",
+                r"e^{-{\lambda}(X_1^2+\dots+X^2_{n})}",
                 r"\Big]",
                 **kwargs,
             )
             # Transition 3 -> 4: Sum in exponent becomes i.i.d. product (raised to n)
             key_maps[3] = {
-                r"(X_1^2+\dots+X^2_n)": r"X^2",
+                r"(X_1^2+\dots+X^2_{n})": r"X^2",
             }
             new_line[3] = False
 
@@ -497,7 +680,7 @@ def _(
                 r"\mathbb{E}",
                 r"\Big[",
                 r"e^{-",
-                r"\lambda",
+                r"{\lambda}",
                 r"X^2",
                 r"}",
                 r"\Big]",
@@ -516,47 +699,39 @@ def _(
             lines[5] = MathTex(
                 r"=",
                 r"{e}^{\lambda}",
-                r"\bigg( ",
+                r"\bigg(",
                 r"\int",
                 r"^1",
-                r"_0",
+                r"_{-1}",
                 r"e^{-",
-                r"\lambda",
+                r"{\lambda}",
                 r"x^2",
                 r"}",
+                r"{",
                 r"dx",
+                r"\over",
+                r"2",
+                r"}",
                 r"\bigg)^{n}",
                 **kwargs,
             )
             # Transition 5 -> 6: Substitution/Scaling
             key_maps[5] = {
                 r"^1": r"^{\sqrt{2",
-                r"{\lambda }": r"\frac{1}{2}",
+                r"_{-1}": r"_{-\sqrt{2",
+                r"{{\lambda} }": r"\frac{1}{2}",
                 r"x^2": r"z^2",
-                r"dx": r"{dz \over \sqrt{2\lambda}}",
+                r"dx": r"dz",
             }
-            #    r"^1": r"^{\sqrt{2\lambda}}",
-            #    r"-\lambda": r"-\frac{1}{2}",
+            #    r"^1": r"^{\sqrt{2{\lambda}}}",
+            #    r"-{\lambda}": r"-\frac{1}{2}",
             #    r"x^2}": r"z^2}",
             #    r"dx": r"dz",
             # }
-            new_line[5] = False
-
-            # --- STEP 6 ---
-            lines_6_temp = MathTex(
-                r"=",
-                r"{e}^{\lambda}",
-                r"\bigg( ",
-                r"\int",
-                r"^{\sqrt{2\lambda}}",
-                r"_0",
-                r"e^{-",
-                r"\frac{1}{2}",
-                r"z^2",
-                r"}",
-                r"{dz \over \sqrt{2\lambda}}",
-                r"\bigg)^{n}",
-                **kwargs,
+            new_line[5] = True
+            explanation[5] = MathTex(
+                r"\text{Def'n of i.i.d. } X\sim\text{Unif}[-1,1]",
+                **explanation_kwargs,
             )
 
             ####
@@ -565,8 +740,12 @@ def _(
                 r"{e}^{\lambda}",
                 r"\bigg("
                 r"\int",
-                r"^{\sqrt{2\lambda}}",
-                r"_0",
+                r"^{\sqrt{2",
+                r"{ \lambda }",
+                r"}}",
+                r"_{-\sqrt{2",
+                r"{ \lambda }",
+                r"}}",
                 r"e^{-",
                 r"\frac{1}{2}",
                 r"z^2",
@@ -574,17 +753,22 @@ def _(
                 r"{",
                 r"dz",
                 r"\over",
+                r"2",
                 r"\sqrt",
                 r"{",
-                r"2",
-                r"\lambda}",
+                r"{{ 2 }}",
+                r"{\lambda}}",
                 r"}",
                 r"\bigg)^{n}",
                 **kwargs,
             )
 
             # Transition 6 -> 7: Changing limit of integration
-            key_maps[6] = {r"=": r"\le", r"^{\sqrt{2\lambda}}": r"^{\infty}"}
+            key_maps[6] = {
+                r"=": r"\le",
+                r"^{\sqrt{2": r"^{\infty}",
+                r"_{-\sqrt{2": r"_{-\infty}",
+            }
             new_line[6] = False
 
             # --- STEP 7 ---
@@ -592,34 +776,6 @@ def _(
                 r"\le",
                 r"{e}^{\lambda}",
                 r"\bigg(",
-                r"\int",
-                r"^{\infty}",
-                r"_0",
-                r"e^{-",
-                r"\frac{1}{2}",
-                r"z^2",
-                r"}",
-                r"{",
-                r"dz",
-                r"\over",
-                r"\sqrt",
-                r"{",
-                r"2",
-                r"\lambda}",
-                r"}",
-                r"\bigg)^{n}",
-                **kwargs,
-            )
-            # Transition 7 -> 8: Symmetry (0 to inf becomes 1/2 of -inf to inf)
-            key_maps[7] = {r"\le": r"=", r"_0": r"_{-\infty}"}
-            new_line[7] = True
-
-            # --- STEP 8 ---
-            lines[8] = MathTex(
-                r"=",
-                r"{e}^{\lambda}",
-                r"\bigg(",
-                r"{\frac{1}{2}}",
                 r"\int",
                 r"^{\infty}",
                 r"_{-\infty}",
@@ -630,24 +786,32 @@ def _(
                 r"{",
                 r"dz",
                 r"\over",
+                r"2",
                 r"\sqrt",
                 r"{",
-                r"2",
-                r"\lambda}",
+                r"{{ 2 }}",
+                r"{\lambda}}",
                 r"}",
                 r"\bigg)^{n}",
                 **kwargs,
             )
+            # Transition 7 -> 8: Symmetry (0 to inf becomes 1/2 of -inf to inf)
+
             # Transition 8 -> 9: Integral evaluated to sqrt(2pi)
-            key_maps[8] = {
+            key_maps[7] = {
+                r"\le": r"=",
                 r"\int": r"\sqrt{",
                 r"e^{-": r"{2}",
                 r"dz": r"\pi}",
+                r"2": r"{\frac{1}{2}}",
             }
-            new_line[8] = False
+            new_line[7] = True
+            explanation[7] = MathTex(
+                r"\text{Integrate to} \pm \infty", **explanation_kwargs
+            )
 
             # --- STEP 9 ---
-            lines[9] = MathTex(
+            lines[8] = MathTex(
                 r"=",
                 r"{e}^{\lambda}",
                 r"\bigg(",
@@ -659,21 +823,26 @@ def _(
                 r"\over",
                 r"\sqrt",
                 r"{",
-                r"2",
-                r"\lambda}",
+                r"{{ 2 }}",
+                r"{\lambda}}",
                 r"}",
                 r"\bigg)^{n}",
                 **kwargs,
             )
+
             # Transition 9 -> 10: Simplifying the sqrt terms
-            key_maps[9] = dict()
-            #   r"\sqrt{2\lambda}": r"\sqrt{\lambda}",
+            key_maps[8] = dict()
+            #   r"\sqrt{2{\lambda}}": r"\sqrt{{\lambda}}",
             #    r"\sqrt{2\pi}": r"\sqrt{\pi}",  # Absorbed
             # }
-            new_line[9] = False
+            new_line[8] = False
+            explanation[8] = MathTex(
+                r"\text{Evaluate }} \int_{-\infty}^\infty e^{-\frac{1}{2} z^2} dz =\sqrt{2\pi}",
+                **explanation_kwargs,
+            )
 
             # --- STEP 10 ---
-            lines[10] = MathTex(
+            lines[9] = MathTex(
                 r"=",
                 r"{e}^{\lambda}",
                 r"\bigg(",
@@ -684,22 +853,23 @@ def _(
                 r"\over",
                 r"\sqrt",
                 r"{",
-                r"\lambda}",
+                r"{\lambda}}",
                 r"}",
                 r"\bigg)^{n}",
                 **kwargs,
             )
             # Transition 10 -> 11: Plugging in optimal lambda = {n}/2
-            key_maps[11] = {
+            key_maps[9] = {
                 r"=": r"\le",
-                r"\lambda": r"{n}",
+                r"{\lambda}": r"{ n }",
+                r"{\lambda}": r"{  n  }",
             }
-            new_line[10] = True
+            new_line[9] = True
 
             # --- STEP 11 --- Plug in lambda = {n}/2
-            lines[11] = MathTex(
+            lines[10] = MathTex(
                 r"\le",
-                r"{e}^{{n}/2}",
+                r"{e}^{{ n }/2}",
                 r"\bigg(",
                 r"{\frac{1}{2}}",
                 r"{",
@@ -708,25 +878,31 @@ def _(
                 r"\over",
                 r"\sqrt",
                 r"{",
-                r"{n}/2}",
+                r"{  n  }",
+                r"/2}",
                 r"}",
-                r"\bigg)^{n}",
+                r"\bigg)^",
+                r"{n}",
                 **kwargs,
             )
-            print(*enumerate(lines[11]), sep="\n")
-            new_line[11] = False
+            new_line[10] = False
 
-            key_maps[11] = {
+            key_maps[10] = {
                 # Base e with power {n}/2 moves into the second fraction
                 r"{e}^{": r"{ e }",
                 r"{\frac{1}{2}}": r"2",
-                r"\sqrt{": r"/2}",
+                r"\sqrt": r"/2}",
                 r"\pi}": r"\pi",
                 # The outer brackets change size/type
             }
+            explanation[10] = MathTex(
+                r"\text{Plug in optimal } {\lambda} = {n}/2",
+                tex_to_color_map=t2cD,
+                **explanation_kwargs,
+            )
 
             # --- STEP 12 ---
-            lines[12] = MathTex(
+            lines[11] = MathTex(
                 r"\le",
                 r"\bigg(",
                 r"{",
@@ -734,23 +910,32 @@ def _(
                 r"\pi",
                 r"\over",
                 r"2",
-                r"{n}",
+                r"{  n  }",
                 r"}",
-                r"\bigg)^{{n}/2}",
+                r"\bigg)",
+                r"^{",
+                r"{n}",
+                r"/2}",
                 **kwargs,
             )
 
-            print(*enumerate(lines[12]), sep="\n")
-
-            # --- ANIMATION EXECUTION ---
-            lhs = MathTex(
-                r"\mathbb{P}\Big( {X_1^2+\dots+X^2_n} \le 1 \Big)", **kwargs
-            )
-            lhs.to_corner(UL, buff=1)
+            lhs.to_corner(UL, buff=0.3)
             lines[0].next_to(lhs, RIGHT, buff=0.2)
+            lines[0].shift(0.06 * UP)
 
             self.add(lhs)
-            self.play(Write(lines[0]))
+
+            eqn_run_time = 1
+
+            self.play(
+                TransformMatchingTex(
+                    lhs.copy(),
+                    lines[0],
+                    key_map=lhs_keymap,
+                    path_arc=PI / 2,
+                    run_time=eqn_run_time,
+                )
+            )
             self.wait()
 
             all_on_screen = VGroup(lines[0])  # lhs,
@@ -759,22 +944,24 @@ def _(
             index_mob = Text("0").to_corner(UR)
             self.add(index_mob)
 
+            explanation_x = 2.2
+
             for i in range(len(lines) - 1):
                 next_index = Text(f"{i + 1}").to_corner(UR)
                 next_line = lines[i + 1]
                 if new_line[i]:  # True
                     next_line.next_to(
-                        current_rhs, DOWN, aligned_edge=LEFT, buff=0.4
+                        current_rhs, DOWN, aligned_edge=LEFT, buff=0.3
                     )
-                    if next_line.get_bottom()[1] < -3.5:
-                        self.play(
-                            all_on_screen.animate.shift(
-                                UP * (next_line.get_height())
-                            )
-                        )
-                        next_line.next_to(
-                            current_rhs, DOWN, aligned_edge=LEFT, buff=0.4
-                        )
+                    # if next_line.get_bottom()[1] < -3.5:
+                    #    self.play(
+                    #        all_on_screen.animate.shift(
+                    #            UP * (next_line.get_height())
+                    #        )
+                    #    )
+                    #    next_line.next_to(
+                    #        current_rhs, DOWN, aligned_edge=LEFT, buff=0.4
+                    #    )
 
                     self.play(
                         TransformMatchingTex(
@@ -785,6 +972,7 @@ def _(
                             fade_transform_mismatches=False,
                         ),
                         Transform(index_mob, next_index),
+                        run_time=eqn_run_time,
                     )
 
                     all_on_screen.add(next_line)
@@ -798,12 +986,20 @@ def _(
                             key_map=key_maps[i],
                             transform_mismatches=False,
                             fade_transform_mismatches=False,
+                            path_arc=PI / 2,
                         ),
                         Transform(index_mob, next_index),
+                        run_time=eqn_run_time,
                     )
                     all_on_screen.remove(current_rhs)
                     all_on_screen.add(next_line)
                     current_rhs = next_line
+
+                if explanation[i + 1]:
+                    explanation[i + 1].next_to(current_rhs, RIGHT)
+                    explanation[i + 1].set_x(explanation_x, LEFT)
+                    self.play(Write(explanation[i + 1]))
+
                 self.wait(0.5)
 
             self.wait(3)
@@ -811,30 +1007,10 @@ def _(
 
 
 @app.cell
-def _():
+def _(ProbabilityDerivation, mo, render_scene):
+    _video_path = render_scene(ProbabilityDerivation())
+    mo.video(_video_path, loop=True, controls=True, autoplay=True)
     return
-
-
-@app.cell
-def _(ProbabilityDerivation, config, mo):
-    config.quality = "low_quality"
-    config.media_dir = "media"
-    config.verbosity = "WARNING"
-    config.progress_bar = "display"
-
-
-    def render_scene():
-        scene = ProbabilityDerivation()
-        scene.render()
-
-        # This dynamically retrieves the path to the movie file
-        # that Manim just generated!
-        return scene.renderer.file_writer.movie_file_path
-
-
-    video_path = render_scene()
-    mo.video(video_path, loop=True, controls=True, autoplay=True)
-    return render_scene, video_path
 
 
 @app.cell
