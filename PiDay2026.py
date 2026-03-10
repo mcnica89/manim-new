@@ -69,19 +69,24 @@ def _(
     config,
     interpolate_color,
     np,
+    rate_functions,
+    smooth,
 ):
     # Global parameters
     n = 200  # Number of dimensions
-    N_sims = 5000  # 0  # Number of simulations to perform
+    N_sims = 1000  # 0  # Number of simulations to perform
     bins_per_unit = 1
     N_bins = bins_per_unit * n  # Number of bins for the histogram
 
-    np.random.seed(42)  # Set random seed for reproducibility
+    np.random.seed(2)  # Set random seed for reproducibility
     samples = np.random.binomial(n, 0.5, N_sims)  # , 1, (N_sims, n)) ** 2, axis=1)
     bins = np.linspace(0, n, N_bins)
 
     COLOR_1 = "#FF3333"
     COLOR_0 = "#0092CC"
+
+    myYELLOW = "#DCD427"
+    myGRAY = "#969696"
     # COLOR_PI = '#779933' #a green for pi
 
     # Global dictionary for TeX to color mapping
@@ -99,7 +104,13 @@ def _(
         r"\mathbb{P}": non_var_color,
         r"\mathbb{E}": non_var_color,
         r"\sigma^2": YELLOW,
+        r"{k}": myYELLOW,
+        r"{220,098}": myYELLOW,
+        r"{5}": myYELLOW,
+        r"{105}": myYELLOW,
         r"\mathcal{N}": YELLOW,
+        r"\big(": non_var_color,
+        r"\big)": non_var_color,
         r"\bigg(": non_var_color,
         r"\bigg)": non_var_color,
         r"\bigg)^": non_var_color,
@@ -110,6 +121,17 @@ def _(
     }
 
     my_zoom_scale_factor = 3.8
+
+
+    def shrink_to_target(mover, target, run_time=1.5, rate_func=smooth):
+        """
+        Animates mover_mob moving to target_mob's center while shrinking to a point.
+        """
+        return (
+            mover.animate(run_time=run_time, rate_func=rate_func)
+            .move_to(target.get_center())
+            .scale(0.01)
+        )  # .set_opactiy(0)
 
 
     class PiDay(Scene):  # , Slide):
@@ -154,6 +176,12 @@ def _(
             binary_paragraph_lines = generate_binary_paragraph_tex_lines(
                 num_lines, line_length
             )
+
+            first_three_digits = binary_paragraph_lines[0][0:3]
+            last_three_digits = binary_paragraph_lines[-1][
+                -len(r"\ldots") - 3 : -len(r"\ldots")
+            ]
+            print(first_three_digits, last_three_digits)
 
             # Create a VGroup of MathTex objects
             my_fs = 24
@@ -292,9 +320,6 @@ def _(
                     )
                 )
 
-            myYELLOW = "#DCD427"
-            myGRAY = "#969696"
-
             # Create braces and labels
             top_brace_pre = Brace(
                 paragraph, UP, color=myGRAY
@@ -360,9 +385,9 @@ def _(
 
             left_brace = Brace(digit_groups_column, LEFT, color=myGRAY)
             left_brace_label = MathTex(
-                r"\text{5 million total groups}",
+                r"\text{5 million groups}",
                 tex_to_color_map=t2cD,
-                font_size=36,
+                font_size=40,
             ).next_to(left_brace, LEFT, buff=0.1)
 
             self.pause()
@@ -448,10 +473,15 @@ def _(
                     )
                 bar_colors.append(color)
 
-            def my_bar_chart(_hist_values):
+            def my_bar_chart(_hist_values, scale_factor=1.0):
+                max_val = max_hist_value  # max(np.max(_hist_values),1)
                 chart = BarChart(
-                    values=_hist_values,
-                    y_range=[0, max_hist_value, max_hist_value],
+                    values=_hist_values,  # np.minimum(_hist_values*scale_factor, max_hist_value),
+                    y_range=[
+                        0,
+                        max_val,
+                        max_val,
+                    ],  # [0, max_hist_value, max_hist_value],
                     bar_colors=bar_colors,
                     y_length=HIST_HEIGHT,
                     x_length=HIST_WIDTH,
@@ -489,7 +519,7 @@ def _(
             ).move_to(bar_chart.bars[N_bins // 2].get_center() + DOWN * down_len)
 
             label = MathTex(
-                r"\text{Histogram of Number of }{1}\text{'s in our Samples}",
+                r"\text{Histogram: Number of }{1}\text{'s in 200 digits}",
                 tex_to_color_map=t2cD,
             )
             label.width = bar_chart.width
@@ -498,20 +528,11 @@ def _(
             # label = VGroup(label, uline)
 
             sample_fs = 40
-            sample_count_text = MathTex(
-                r"\text{Samples:} 0",
-                font_size=sample_fs,
-                color=myGRAY,
-            ).next_to(bar_chart, DOWN)
-
-            self.play(
-                Create(bar_chart),
-                Write(label_left),
-                Write(label_right),
-                Write(label_mid),
-                Write(label),
-            )
-            self.pause()
+            # sample_count_text = MathTex(
+            #    r"\text{Samples:} 0",
+            #    font_size=sample_fs,
+            #    color=myGRAY,
+            # ).next_to(bar_chart, DOWN)
 
             def my_samples_label(m):
                 return (
@@ -526,7 +547,15 @@ def _(
                 )
 
             samples_label = my_samples_label(0)
-            self.play(Write(samples_label))
+
+            self.play(
+                Create(bar_chart),
+                Write(label_left),
+                Write(label_right),
+                Write(label_mid),
+                Write(label),
+                Write(samples_label),
+            )
             self.pause()
 
             self.play(
@@ -547,13 +576,14 @@ def _(
                     .align_to(label, RIGHT)
                 )
 
-            new_label = my_new_label(0)
-
-            N_samples_to_update = 2_00  # 0  # 100
+            new_label = my_samples_label(0)
+            N_updates = 50  # 25
+            N_samples_to_update = int(len(samples) / N_updates)  # 100
             for i in range(0, len(samples), N_samples_to_update):
                 current_samples = samples[i : i + N_samples_to_update]
+                my_scale_factor = min(5, (len(samples) / (i + 1)) ** 0.5)
                 hist_values += my_hist_values(current_samples)
-                new_chart = my_bar_chart(hist_values)
+                new_chart = my_bar_chart(hist_values, my_scale_factor)
 
                 new_label = my_new_label(i + N_samples_to_update)
 
@@ -561,6 +591,7 @@ def _(
                     Transform(bar_chart, new_chart),
                     Transform(samples_label, new_label),
                     run_time=0.1,
+                    rate_func=rate_functions.linear,
                 )
 
             self.pause()
@@ -576,7 +607,7 @@ def _(
             max_bin_index = np.argmax(hist_values)
 
             # Calculate the position for the center of the max bin
-            max_bin_position = x_axis.number_to_point(max_bin_index + 0.5)[0]
+            max_bin_position = x_axis.number_to_point(100 + 0.5)[0]
             dashed_line = DashedLine(
                 start=[max_bin_position, y_axis.number_to_point(0)[1], 0],
                 end=[
@@ -620,14 +651,13 @@ def _(
             Z_COLOR = myYELLOW
             # Make the Bell curve
 
-            off_x = (max_bin_index + 0.5) / bins_per_unit
+            off_x = (100 + 0.5) / bins_per_unit
 
             sanity_plot = ax.plot(
                 lambda x: np.exp(-((x - off_x) ** 2)),
                 x_range=[0, n],
                 color=HIST_COLOR,
             )
-
             graph = ax.plot(
                 lambda x: np.exp(-((x - off_x) ** 2) / (0.5 * n)),
                 x_range=[0, n],
@@ -680,10 +710,14 @@ def _(
             self.pause()
 
             # Create and animate the dashed line with label
+            bin_label_fs = label_fs * 1.2
             bin_label_1 = MathTex(
-                r"\mathbb{P}\bigg(\text{Exactly 100 }{1}\text{'s}\bigg)",
+                r"\mathbb{P}\big(\text{Exactly }",
+                r"100",
+                r"\;",
+                r"{1}\text{'s}\big)",
                 tex_to_color_map=t2cD,
-                font_size=label_fs,
+                font_size=bin_label_fs,
             )
 
             # bin_label_2 = MathTex(
@@ -801,11 +835,15 @@ def _(
             my_pi_approx = MathTex(
                 r"\pi",
                 r"\approx",
-                r"\bigg(\frac{5,000,000}{10 \times 281,474}\bigg)^2",
+                r"\bigg({5,000,000 \over 10 \times",
+                r"281,474",
+                r"}",
+                r"\bigg)^2",
                 # r"\! + \!",
                 # r"\sqrt{ {n} }"
                 # r"\frac{ 2 }{ 3 \sqrt{5} }",
                 # r"Z",
+                tex_to_color_map=t2cD,
                 font_size=my_fs,
             )
             ans = MathTex(r"\approx 3.1554", font_size=my_fs)
@@ -824,7 +862,306 @@ def _(
             self.play(Write(ans))
             self.pause()
 
-            return 0
+            ## end of classic method
+
+            new_bin_label_1 = MathTex(
+                r"\mathbb{P}\big(\text{Exactly }",
+                r"{105}",
+                r"\;",
+                r"{1}\text{'s}\big)",
+                tex_to_color_map=t2cD,
+                font_size=bin_label_fs,
+            )
+            new_bin_label_1.align_to(bin_label_1, DOWN)
+            new_bin_label_1.align_to(bin_label_1, LEFT)
+
+            # bin_label_2 = MathTex(
+            #    r"= \frac{1}{2^{100}}\binom{200}{100}",
+            # r"\! + \!",
+            # r"\sqrt{ {n} }"
+            # r"\frac{ 2 }{ 3 \sqrt{5} }",
+            # r"Z",
+            #    font_size=label_fs,
+            # )
+
+            correction_term = MathTex(
+                r"e^{- {5}^2/100}",
+                # r"\! + \!",
+                # r"\sqrt{ {n} }"
+                # r"\frac{ 2 }{ 3 \sqrt{5} }",
+                # r"Z",
+                tex_to_color_map=t2cD,
+                font_size=label_fs * 1.3,
+            )
+            correction_term.next_to(bin_label_2, RIGHT, buff=0.15).shift(0.2 * UP)
+
+            old_x = dashed_line.get_x()
+            new_x = x_axis.number_to_point(105 + 0.5)[0]
+            self.play(
+                dashed_line.animate.shift(LEFT), rate_func=rate_functions.wiggle
+            )
+            self.pause()
+
+            self.play(
+                dashed_line.animate.shift((new_x - old_x) * RIGHT),
+                rate_func=rate_functions.ease_in_out_back,
+            )
+            my105 = (
+                MathTex(r"105", font_size=label_fs, color=myYELLOW)
+                .next_to(dashed_line, DOWN)
+                .align_to(label_mid, DOWN)
+            )
+            label_mid_copy = label_mid.copy()
+            self.play(ReplacementTransform(label_mid, my105))
+            self.pause()
+
+            self.play(
+                LaggedStart(
+                    shrink_to_target(my105.copy(), bin_label_1),
+                    TransformMatchingTex(bin_label_1, new_bin_label_1),
+                    lag_ratio=0.5,
+                )
+            )
+            self.play(Write(correction_term))
+            self.pause()
+
+            numerator2 = MathTex(
+                "220,098", font_size=label_fs * 1.15, color=myYELLOW
+            )
+            numerator2.move_to(numerator)
+            approx_label_2.generate_target()
+            approx_label_2.target.shift(0.5 * LEFT)
+            correction_term_copy = (
+                correction_term.copy()
+                .next_to(approx_label_2.target, RIGHT, buff=0.15)
+                .shift(0.2 * UP)
+            )
+
+            self.play(
+                FadeOut(numerator),
+                ReplacementTransform(digit_groups_column.copy(), numerator2),
+                ReplacementTransform(correction_term.copy(), correction_term_copy),
+                MoveToTarget(approx_label_2),
+            )
+
+            my_pi_approx2 = MathTex(
+                r"\pi",
+                r"\approx",
+                r"\bigg({5,000,000 \over 10 \times",
+                r"{220,098}",
+                r"}",
+                r"e^{- {5}^2/100}",
+                r"\bigg)^2",
+                # r"\! + \!",
+                # r"\sqrt{ {n} }"
+                # r"\frac{ 2 }{ 3 \sqrt{5} }",
+                # r"Z",
+                tex_to_color_map=t2cD,
+                font_size=my_fs,
+            )
+
+            my_pi_approx2.move_to(my_pi_approx)
+            my_pi_approx2.align_to(my_pi_approx, LEFT)
+
+            ans2 = MathTex(r"\approx 3.1301", font_size=my_fs).next_to(
+                my_pi_approx2, buff=0.2
+            )
+            self.play(
+                FadeOut(ans),
+                LaggedStart(
+                    shrink_to_target(
+                        VGroup(numerator2, correction_term_copy).copy(),
+                        my_pi_approx,
+                    ),
+                    TransformMatchingTex(my_pi_approx, my_pi_approx2),
+                    lag_ratio=0.5,
+                ),
+            )
+            self.pause()
+
+            self.play(FadeIn(ans2, shift=RIGHT))
+            self.pause()
+
+            pi_approx_only = MathTex(
+                r"\pi",
+                r"\approx",
+                font_size=my_fs,
+            )
+
+            new_pi_formula = MathTex(
+                r"{",
+                r"3.1554",
+                r"+",
+                r"3.1301",
+                r"\over",
+                r"2",
+                r"}",
+                font_size=my_fs,
+            )
+
+            new_pi = VGroup(pi_approx_only, new_pi_formula).arrange(
+                RIGHT, buff=0.2
+            )
+
+            new_pi.move_to(numerator2)
+            new_pi.align_to(my_pi_approx2, LEFT)
+
+            self.play(
+                TransformMatchingTex(my_pi_approx2.copy(), pi_approx_only),
+                TransformMatchingTex(ans2.copy(), new_pi_formula),
+                FadeOut(
+                    numerator2,
+                    denominator,
+                    correction_term_copy,
+                    approx_label_2,
+                    approx_label_1[ix_of_over],
+                ),
+            )
+            self.pause()
+
+            avg_equals = MathTex(r"\approx 3.14275", font_size=my_fs)
+            avg_equals.next_to(new_pi, DOWN)
+            avg_equals.align_to(pi_approx_only[1], LEFT)
+            self.play(FadeIn(avg_equals, shift=DOWN))
+            self.pause()
+
+            final_bin_label_1 = MathTex(
+                r"\mathbb{P}\big(\text{Exactly }",
+                r"100",
+                r"\!+\!",
+                r"{k}",
+                r"\;",
+                r"{1}\text{'s}\big)",
+                tex_to_color_map=t2cD,
+                font_size=bin_label_fs,
+            )
+            final_bin_label_1.align_to(new_bin_label_1, DOWN)
+            final_bin_label_1.align_to(new_bin_label_1, LEFT)
+
+            # bin_label_2 = MathTex(
+            #    r"= \frac{1}{2^{100}}\binom{200}{100}",
+            # r"\! + \!",
+            # r"\sqrt{ {n} }"
+            # r"\frac{ 2 }{ 3 \sqrt{5} }",
+            # r"Z",
+            #    font_size=label_fs,
+            # )
+
+            final_correction_term = MathTex(
+                r"e^{- {k}^2/100}",
+                # r"\! + \!",
+                # r"\sqrt{ {n} }"
+                # r"\frac{ 2 }{ 3 \sqrt{5} }",
+                # r"Z",
+                tex_to_color_map=t2cD,
+                font_size=label_fs * 1.3,
+            )
+            final_correction_term.move_to(correction_term).align_to(
+                correction_term, LEFT
+            )
+
+            final_my105 = MathTex(
+                r"100",
+                r"\!+\!",
+                r"{k}",
+                font_size=label_fs,
+                tex_to_color_map=t2cD,
+            ).move_to(label_mid_copy)
+
+            self.play(
+                dashed_line.animate.shift(LEFT), rate_func=rate_functions.wiggle
+            )
+            self.play(
+                TransformMatchingTex(my105, final_my105, key_map={"105": r"100"})
+            )
+            self.pause()
+
+            self.play(
+                TransformMatchingTex(
+                    new_bin_label_1, final_bin_label_1, key_map={"{5}": r"{k}"}
+                )
+            )
+            self.play(
+                TransformMatchingTex(
+                    correction_term, final_correction_term, key_map={"{5}": r"{k}"}
+                )
+            )
+            self.pause()
+
+            final_pi_formula = MathTex(
+                r"{",
+                r"3.1554",
+                r"\!",
+                r"+",
+                r"\!",
+                r"\ldots",
+                r"\!",
+                r"+",
+                r"\!",
+                r"3.1301",
+                r"\over",
+                r"21",
+                r"}",
+                r"{}",
+                font_size=my_fs,
+            ).scale(0.8)
+
+            def my_dashed_line(ix):
+                max_bin_position = x_axis.number_to_point(ix + 0.5)[0]
+                dashed_line = DashedLine(
+                    start=[max_bin_position, y_axis.number_to_point(0)[1], 0],
+                    end=[
+                        max_bin_position,
+                        y_axis.number_to_point(max_hist_value)[1],
+                        0,
+                    ],
+                    color=myYELLOW,
+                    dash_length=0.1,
+                )
+                dashed_line.opacity = 0.7
+
+                return dashed_line
+
+            self.next_section()
+
+            many_lines = [my_dashed_line(ix) for ix in [90, 95, 100, 110]]
+            self.play(
+                LaggedStart(*[Create(mob) for mob in many_lines], lag_ratio=0.5)
+            )
+            self.pause()
+
+            final_pi_formula.move_to(new_pi_formula)
+            final_pi_formula.align_to(new_pi_formula, LEFT)
+            lines_copy = VGroup(many_lines).copy()
+            digit_groups_column_copy = digit_groups_column.copy()
+            self.play(
+                shrink_to_target(digit_groups_column_copy, pi_approx_only),
+                shrink_to_target(lines_copy, pi_approx_only),
+                FadeOut(avg_equals),
+            )
+            self.remove(lines_copy)
+            self.remove(digit_groups_column_copy)
+            self.play(
+                TransformMatchingTex(
+                    new_pi_formula,
+                    final_pi_formula,
+                    key_map={r"2": r"21"},
+                )
+            )
+            self.pause()
+
+            final_avg_equals = MathTex(r"\approx 3.1412", font_size=my_fs).scale(2)
+
+            final_avg_equals.next_to(final_pi_formula, DOWN, buff=0.6)
+            final_avg_equals.align_to(pi_approx_only[1], LEFT)
+            self.play(FadeIn(final_avg_equals, shift=DOWN))
+            surrounding_rectangle = SurroundingRectangle(
+                final_avg_equals,
+                color=myYELLOW,
+                buff=0.2,
+            )
+            self.play(Create(surrounding_rectangle))
+            self.pause()
 
             self.wait(1)
             print("Done!")
@@ -836,11 +1173,14 @@ def _(
         PiDay,
         bins,
         bins_per_unit,
+        myGRAY,
+        myYELLOW,
         my_zoom_scale_factor,
         n,
         n_color,
         non_var_color,
         samples,
+        shrink_to_target,
         t2cD,
     )
 
