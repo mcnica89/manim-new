@@ -36,6 +36,7 @@ def _(config):
 
 @app.cell
 def _(
+    Arrow,
     Axes,
     BLUE,
     BarChart,
@@ -44,12 +45,12 @@ def _(
     DOWN,
     DashedLine,
     GRAY_B,
+    GRAY_C,
     GREEN,
     LEFT,
     MathTex,
     RED,
     RIGHT,
-    Scene,
     Transform,
     UL,
     UP,
@@ -57,6 +58,7 @@ def _(
     Write,
     YELLOW,
     YELLOW_A,
+    ZoomedScene,
     np,
 ):
     # Global parameters
@@ -84,8 +86,10 @@ def _(
         r"\mathbf{1}": YELLOW_A,
         r"\mathbb{P}": non_var_color,
         r"\mathbb{E}": non_var_color,
-        r"\bigg(": non_var_color,
-        r"\bigg)": non_var_color,
+        r"\sigma^2": YELLOW,
+        r"\mathcal{N}": YELLOW,
+        r"\bigg(": YELLOW,
+        r"\bigg)": YELLOW,
         r"\bigg)^": non_var_color,
         r"\Big]": non_var_color,
         r"\Big[": non_var_color,
@@ -93,22 +97,23 @@ def _(
         r"\Big(": non_var_color,
     }
 
-    my_zoom_scale_factor = 4
+    my_zoom_scale_factor = 3.8
 
 
-    class ProbabilitySpheres(Scene):  # (ZoomedScene, Slide):
-        # def __init__(self, **kwargs):
-        #    ZoomedScene.__init__(
-        #        self,
-        #        zoomed_display_corner=np.array([-1, 1, 0.0]),
-        #        zoom_factor=0.3,
-        #        zoomed_display_height=16 / my_zoom_scale_factor,
-        #        zoomed_display_width=16 / my_zoom_scale_factor,
-        #        zoomed_camera_config={
-        #            "default_frame_stroke_width": 3,
-        #        },
-        #        **kwargs,
-        #    )
+    class ProbabilitySpheres(ZoomedScene):  # , Slide):
+        def __init__(self, **kwargs):
+            ZoomedScene.__init__(
+                self,
+                zoomed_display_corner=np.array([-1, 1, 0.0]),
+                zoom_factor=0.23,
+                zoomed_display_height=16 / my_zoom_scale_factor,
+                zoomed_display_width=16 / my_zoom_scale_factor,
+                zoomed_display_corner_buff=0.3,
+                zoomed_camera_config={
+                    "default_frame_stroke_width": 3,
+                },
+                **kwargs,
+            )
 
         def pause(self):
             self.wait(0.1)
@@ -138,6 +143,7 @@ def _(
             def my_bar_chart(_hist_values):
                 low_color = RED
                 high_color = BLUE
+                some_color = GRAY_B
                 chart = BarChart(
                     values=_hist_values,
                     y_range=[0, max_hist_value, max_hist_value],
@@ -147,8 +153,8 @@ def _(
                     ],
                     y_length=HIST_HEIGHT,
                     x_length=HIST_WIDTH,
-                    x_axis_config={"font_size": 24},
-                    y_axis_config={"font_size": 1},
+                    x_axis_config={"font_size": 24, "stroke_color": some_color},
+                    y_axis_config={"font_size": 1, "stroke_color": some_color},
                 )
                 chart.to_edge(RIGHT)
                 chart.to_edge(UP, buff=1.0)
@@ -180,7 +186,7 @@ def _(
                 tex_to_color_map=t2cD,
             ).next_to(bar_chart, UP)
 
-            sample_fs = 36
+            sample_fs = 40
             sample_count_text = MathTex(
                 r"\text{Samples:} 0", font_size=sample_fs
             ).next_to(bar_chart, DOWN)
@@ -200,7 +206,7 @@ def _(
 
             def my_samples_label(m):
                 return (
-                    MathTex(r"\text{Samples:} ", str(m), font_size=24)
+                    MathTex(r"\text{Samples:} ", str(m), font_size=sample_fs)
                     .next_to(label, DOWN)
                     .align_to(label, RIGHT)
                 )
@@ -211,7 +217,9 @@ def _(
 
             def my_new_label(m):
                 return (
-                    MathTex(r"\text{Samples:} ", "{:,}".format(m), font_size=24)
+                    MathTex(
+                        r"\text{Samples:} ", "{:,}".format(m), font_size=sample_fs
+                    )
                     .next_to(label, DOWN)
                     .align_to(label, RIGHT)
                 )
@@ -310,10 +318,11 @@ def _(
                 font_size=label_fs,
             )
 
-            my_buff = 0.3
+            my_buff = 0.4
+            space_buff = 0.1
             LLN_label = (
                 VGroup(LLN_label_1, LLN_label_2)
-                .arrange(DOWN)
+                .arrange(DOWN, buff=space_buff)
                 .to_corner(UL, buff=my_buff)
             )
 
@@ -390,28 +399,43 @@ def _(
             CLT_label_2 = MathTex(
                 r"{{ X^2_{1} + \ldots + X^2_{n} }",
                 r"\approx",
+                r"\mathcal{N}",
+                r"\bigg(",
                 r"{n}",
                 r"{1 \over 3}",
-                r"\! + \!",
-                r"\sqrt{ {n} }"
-                r"\frac{ 2 }{ 3 \sqrt{5} }",
-                r"Z",
+                r",",
+                r"\sigma^2"
+                r"\bigg)",
+                # r"\! + \!",
+                # r"\sqrt{ {n} }"
+                # r"\frac{ 2 }{ 3 \sqrt{5} }",
+                # r"Z",
                 tex_to_color_map=t2cD,
                 font_size=label_fs,
             )
+            CLT_label_3 = MathTex(
+                r"\text{1 Standard Deviation}",
+                r"=",
+                r"\sqrt{ {n} }"
+                r"\frac{ 2 }{ 3 \sqrt{5} }",
+                tex_to_color_map=t2cD,
+                font_size=label_fs,
+            )
+            CLT_label_3[0].color = YELLOW
 
             CLT_label = (
-                VGroup(CLT_label_1, CLT_label_2)
-                .arrange(DOWN)
+                VGroup(CLT_label_1, CLT_label_2, CLT_label_3)
+                .arrange(DOWN, buff=0.1)
                 .next_to(LLN_eqn, DOWN)
-                .to_edge(LEFT, buff=my_buff)
+                .to_edge(LEFT, buff=0.1)
             )
 
             self.play(Write(CLT_label_1))
             self.play(Write(CLT_label_2))
             self.pause()
 
-            self.next_section()
+            self.play(Write(CLT_label_3))
+            self.pause()
 
             # Code to add the additional x-axis labels and underbrace
             offset = 0.3  # Adjust this as necessary for positioning the labels
@@ -444,7 +468,7 @@ def _(
             )
 
             # Create text labels using MathTex with tex_to_color_map
-            my_fs = 24
+            my_fs = 28
             brace_text_right = MathTex(
                 r"+1 \text{ SD}",
                 tex_to_color_map=t2cD,
@@ -468,20 +492,53 @@ def _(
             # Resuming the existing construct flow
             self.pause()
 
-            self.wait(2)
-
-            return 0
-
-            return 0
             self.next_section()
 
+            location = bar_chart.bars[0 : 1 * bins_per_unit].get_center()
+
+            P_le_1 = MathTex(
+                r"\mathbb{P}\big( X^2_{1} + \ldots + X^2_{n} \le 1 \big)",
+                tex_to_color_map=t2cD,
+                font_size=42,
+            ).move_to(location + 1.5 * DOWN)
+            start_position = (
+                P_le_1.get_top() + 0.2 * DOWN
+            )  # Start just above the mobject
+
+            # Define the end position, 'location' is the given end point for the arrow.
+            # Ensure that the y-coordinate of 'location' is above the start_position's y-coordinate for an upward arrow
+            end_position = location + 0.02 * DOWN
+
+            # Create the arrow
+            arrow = Arrow(
+                start=start_position,
+                end=end_position,
+                color=GRAY_C,  # You can specify any color you prefer
+            )
+            self.play(Write(P_le_1))
+            self.play(Write(arrow))
+            self.pause()
+
             zoom_target = (
-                bar_chart.bars[0 : 1 * bins_per_unit].get_center() + 0.1 * DOWN
+                bar_chart.bars[0 : 1 * bins_per_unit + 1].get_center()
+                + 0.1 * DOWN
+                + 0.05 * LEFT
             )
             self.zoomed_camera.frame.move_to(zoom_target)
 
             # Activate zooming and then animate the zoom-in effect after the histogram animation is done
             self.activate_zooming(animate=True)
+            self.pause()
+
+            large_deviations = MathTex(
+                r"""\text{``Large deviation"}""",
+                tex_to_color_map=t2cD,
+                font_size=46,
+            ).to_corner(UL, buff=0.65)
+            large_deviations.set_z_index(
+                1
+            )  # large_deviations = large_deviations.set_z_index(1)
+            self.play(Write(large_deviations))
             self.pause()
 
             self.wait(1)
@@ -512,11 +569,14 @@ def _(ProbabilitySpheres, mo, render_scene):
 def _(
     BLUE,
     DOWN,
+    FadeIn,
+    FadeOut,
     GRAY_B,
     GRAY_C,
     GREEN,
     LEFT,
     MathTex,
+    MoveToTarget,
     PI,
     RED,
     RIGHT,
@@ -530,9 +590,15 @@ def _(
     VGroup,
     Write,
     YELLOW_A,
+    np,
 ):
     class ProbabilityDerivation(Scene):
+        def pause(self):
+            self.wait(0.1)
+            # self.next_slide()
+
         def construct(self):
+            self.next_section(skip_animations=True)
             non_var_color = GRAY_B
             n_color = BLUE
             lambda_color = RED
@@ -555,12 +621,13 @@ def _(
                 r"{  n  }": n_color,
                 r"{\lambda}": lambda_color,
                 r"{ \lambda }": lambda_color,
+                r"X^2": GREEN,
                 r"(X_1^2+\dots+X^2_{n})": GREEN,
                 r"{X_1^2+\dots+X^2_{n}}": GREEN,
             }
-
-            explanation_kwargs = {"font_size": 32}
-            kwargs = {"font_size": 40, "tex_to_color_map": t2cD}
+            eqn_size = 41
+            explanation_kwargs = {"font_size": 31}
+            kwargs = {"font_size": eqn_size, "tex_to_color_map": t2cD}
             num_steps = 12
 
             lines = [None] * num_steps
@@ -923,7 +990,8 @@ def _(
             lines[0].next_to(lhs, RIGHT, buff=0.2)
             lines[0].shift(0.06 * UP)
 
-            self.add(lhs)
+            self.play(Write(lhs))
+            self.pause()
 
             eqn_run_time = 1
 
@@ -939,6 +1007,7 @@ def _(
             self.wait()
 
             all_on_screen = VGroup(lines[0])  # lhs,
+            all_explanations = VGroup()
             current_rhs = lines[0]
 
             index_mob = Text("0").to_corner(UR)
@@ -991,6 +1060,7 @@ def _(
                         Transform(index_mob, next_index),
                         run_time=eqn_run_time,
                     )
+                    self.pause()
                     all_on_screen.remove(current_rhs)
                     all_on_screen.add(next_line)
                     current_rhs = next_line
@@ -999,11 +1069,148 @@ def _(
                     explanation[i + 1].next_to(current_rhs, RIGHT)
                     explanation[i + 1].set_x(explanation_x, LEFT)
                     self.play(Write(explanation[i + 1]))
+                    self.pause()
+                    all_explanations.add(explanation[i + 1])
+            # { \pi^{ {n} \over 2} }
+            ans = MathTex(
+                r"{",
+                r"\pi^",
+                r"{n}",
+                r"/2",
+                r"\over",
+                r"{",
+                r"2^{ {n} }",
+                r"( { n } / 2 )!",
+                r"}",
+                r"}",
+                tex_to_color_map=t2cD,
+                font_size=eqn_size,
+            )
 
-                self.wait(0.5)
+            print(*enumerate(ans), sep="\n")
+            eq = MathTex(r"=", tex_to_color_map=t2cD, font_size=eqn_size)
+            lhs.generate_target()
+            current_rhs.generate_target()
+            my_scale = 1.2
+            VGroup(ans, eq, lhs.target, current_rhs.target).arrange(
+                RIGHT, buff=0.2
+            ).move_to(np.array([0, 0, 0])).scale(my_scale)
+            # current_rhs.target.next_to(lhs, RIGHT, buff=0.2)
+            self.next_section()
+            self.play(
+                MoveToTarget(lhs),
+                MoveToTarget(current_rhs),
+                *[
+                    FadeOut(mob)
+                    for mob in all_on_screen + all_explanations
+                    if mob is not current_rhs
+                ],
+            )
+            self.pause()
+            self.play(FadeIn(eq, shift=LEFT))
+            self.play(Write(ans))
+            self.pause()
+
+            ans.generate_target()
+            VGroup(ans.target, current_rhs.target).arrange(
+                RIGHT, buff=0.2
+            ).move_to(np.array([0, 0, 0]))
+
+            self.play(
+                MoveToTarget(ans),
+                MoveToTarget(current_rhs),
+                FadeOut(eq),
+                FadeOut(lhs),
+            )
+            self.pause()
+
+            final_rhs = (
+                MathTex(
+                    r"\le",
+                    r"\bigg(",
+                    r"{",
+                    r"{ e }",
+                    r"\over",
+                    r"{  n  }  / 2",
+                    r"}",
+                    r"\bigg)",
+                    r"^{",
+                    r"{n}",
+                    r"/2}",
+                    **kwargs,
+                )
+                .scale(my_scale)
+                .align_to(current_rhs, LEFT)
+            )
+
+            final_lhs = (
+                MathTex(
+                    r"{",
+                    r"1",
+                    r"\over",
+                    r"{",
+                    r"( { n } / 2 )!",
+                    r"}",
+                    r"}",
+                    tex_to_color_map=t2cD,
+                    font_size=eqn_size,
+                )
+                .scale(my_scale)
+                .align_to(ans, RIGHT)
+            )
+
+            self.play(
+                TransformMatchingTex(ans, final_lhs, key_map={r"\pi^": r"1"}),
+                TransformMatchingTex(current_rhs, final_rhs),
+            )
+            self.pause()
+
+            final_rhs2 = (
+                MathTex(
+                    r"\ge",
+                    r"\bigg(",
+                    r"{",
+                    r"{  n  } / 2",
+                    r"\over",
+                    r"{ e }",
+                    r"}",
+                    r"\bigg)",
+                    r"^{",
+                    r"{n}",
+                    r"/2}",
+                    **kwargs,
+                )
+                .scale(my_scale)
+                .align_to(final_rhs, LEFT)
+            )
+
+            final_lhs2 = (
+                MathTex(
+                    r"( { n } / 2 )!",
+                    tex_to_color_map=t2cD,
+                    font_size=eqn_size,
+                )
+                .scale(my_scale)
+                .next_to(final_rhs[0], LEFT, buff=0.2)
+            )
+
+            self.play(
+                TransformMatchingTex(
+                    final_lhs, final_lhs2, key_map={r"\pi^": r"1"}
+                ),
+                TransformMatchingTex(
+                    final_rhs, final_rhs2, key_map={r"\le": r"\ge"}
+                ),
+            )
+            self.pause()
 
             self.wait(3)
     return (ProbabilityDerivation,)
+
+
+@app.cell
+def _():
+    return
 
 
 @app.cell
