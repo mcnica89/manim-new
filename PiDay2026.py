@@ -18,7 +18,7 @@ def _(config):
         if not name.startswith("_"):
             globals()[name] = getattr(manim, name)
 
-    config.quality = "low_quality"
+    config.quality = "high_quality"  # "low_quality"
     config.media_dir = "media"
     config.verbosity = "WARNING"
     config.progress_bar = "display"
@@ -56,7 +56,7 @@ def _(
     MoveToTarget,
     RIGHT,
     ReplacementTransform,
-    Scene,
+    Slide,
     SurroundingRectangle,
     Transform,
     TransformMatchingTex,
@@ -78,7 +78,7 @@ def _(
     bins_per_unit = 1
     N_bins = bins_per_unit * n  # Number of bins for the histogram
 
-    np.random.seed(2)  # Set random seed for reproducibility
+    np.random.seed(31415)  # Set random seed for reproducibility
     samples = np.random.binomial(n, 0.5, N_sims)  # , 1, (N_sims, n)) ** 2, axis=1)
     bins = np.linspace(0, n, N_bins)
 
@@ -134,10 +134,10 @@ def _(
         )  # .set_opactiy(0)
 
 
-    class PiDay(Scene):  # , Slide):
+    class PiDay(Slide):  # Scene):  # , Slide):
         def pause(self):
             self.wait(0.1)
-            # self.next_slide()
+            self.next_slide()
 
         def construct(self):
             print("Constructing...")
@@ -177,10 +177,28 @@ def _(
                 num_lines, line_length
             )
 
-            first_three_digits = binary_paragraph_lines[0][0:3]
-            last_three_digits = binary_paragraph_lines[-1][
-                -len(r"\ldots") - 3 : -len(r"\ldots")
-            ]
+            # Specify the first three digits you want
+            first_three_digits = "010"
+
+            # Modify the first element of binary_paragraph_lines
+            binary_paragraph_lines[0] = (
+                first_three_digits + binary_paragraph_lines[0][3:]
+            )
+
+            # Specify the last three digits you want before "\ldots"
+            last_three_digits = "011"
+
+            # Modify the last element of binary_paragraph_lines
+            binary_paragraph_lines[-1] = (
+                binary_paragraph_lines[-1][: -len(r"\ldots") - 3]
+                + last_three_digits
+                + r"\ldots"
+            )
+
+            # first_three_digits = binary_paragraph_lines[0][0:3]
+            # last_three_digits = binary_paragraph_lines[-1][
+            #    -len(r"\ldots") - 3 : -len(r"\ldots")
+            # ]
             print(first_three_digits, last_three_digits)
 
             # Create a VGroup of MathTex objects
@@ -337,7 +355,9 @@ def _(
 
             # Create the groups of 200 random digits as compressed visible digits
             num_example_groups = 5  # Examples before and after \vdots
-            compressed_digit_lines = ["101\ldots000"] + [
+            compressed_digit_lines = [
+                first_three_digits + r"\ldots" + last_three_digits
+            ] + [
                 create_compressed_digit_group(digits_per_group, visible_digits)
                 for _ in range(num_example_groups)
             ]
@@ -363,6 +383,7 @@ def _(
                 vdots,
                 compressed_digit_groups[-1],
             ).arrange(DOWN, buff=0.15)
+            digit_groups_column[-2].shift(0.25 * DOWN)
 
             # Adjust the width and position of the column
             digit_groups_column.width = paragraph.width / 5
@@ -389,8 +410,6 @@ def _(
                 tex_to_color_map=t2cD,
                 font_size=40,
             ).next_to(left_brace, LEFT, buff=0.1)
-
-            self.pause()
 
             # Animate braces and labels
             # self.play(
@@ -588,7 +607,7 @@ def _(
                 new_label = my_new_label(i + N_samples_to_update)
 
                 self.play(
-                    Transform(bar_chart, new_chart),
+                    Transform(bar_chart.bars, new_chart.bars),
                     Transform(samples_label, new_label),
                     run_time=0.1,
                     rate_func=rate_functions.linear,
@@ -681,13 +700,15 @@ def _(
             self.play(Create(graph), run_time=2)  # FadeIn(area),
             self.pause()
 
+            # return 0
+
             label_spacing = 0.7
 
             # Create and animate the dashed line with label
             CLT_label_1 = MathTex(
                 r"\text{Bell Curve Function}",
                 tex_to_color_map=t2cD,
-                font_size=label_fs,
+                font_size=label_fs * 1.2,
             )
             CLT_label_2 = MathTex(
                 r"=\frac{1}{\sqrt{2\pi}} e^{-\frac{1}{2}x^2}",
@@ -696,7 +717,7 @@ def _(
                 # r"\frac{ 2 }{ 3 \sqrt{5} }",
                 # r"Z",
                 # color='#B7B327',
-                font_size=label_fs,
+                font_size=label_fs * 1.2,
             )
 
             CLT_label = (
@@ -850,7 +871,7 @@ def _(
             my_pi_group = (
                 VGroup(my_pi_approx, ans)
                 .arrange(RIGHT, buff=0.2)
-                .to_edge(DOWN, buff=0.6)
+                .to_edge(DOWN, buff=0.4)
             )  # , buff=pi_group_buff)
 
             self.play(
@@ -860,7 +881,8 @@ def _(
                 )
             )
             self.play(Write(ans))
-            self.pause()
+            # self.pause()
+            self.next_slide(loop=True)
 
             ## end of classic method
 
@@ -900,6 +922,7 @@ def _(
             self.play(
                 dashed_line.animate.shift(LEFT), rate_func=rate_functions.wiggle
             )
+
             self.pause()
 
             self.play(
@@ -943,6 +966,7 @@ def _(
                 ReplacementTransform(correction_term.copy(), correction_term_copy),
                 MoveToTarget(approx_label_2),
             )
+            self.pause()
 
             my_pi_approx2 = MathTex(
                 r"\pi",
@@ -963,7 +987,7 @@ def _(
             my_pi_approx2.move_to(my_pi_approx)
             my_pi_approx2.align_to(my_pi_approx, LEFT)
 
-            ans2 = MathTex(r"\approx 3.1301", font_size=my_fs).next_to(
+            ans2 = MathTex(r"\approx", r"3.1301", font_size=my_fs).next_to(
                 my_pi_approx2, buff=0.2
             )
             self.play(
@@ -1023,8 +1047,8 @@ def _(
             avg_equals.next_to(new_pi, DOWN)
             avg_equals.align_to(pi_approx_only[1], LEFT)
             self.play(FadeIn(avg_equals, shift=DOWN))
-            self.pause()
-
+            # self.pause()
+            self.next_slide(loop=True)
             final_bin_label_1 = MathTex(
                 r"\mathbb{P}\big(\text{Exactly }",
                 r"100",
@@ -1071,6 +1095,8 @@ def _(
             self.play(
                 dashed_line.animate.shift(LEFT), rate_func=rate_functions.wiggle
             )
+            self.pause()  # loop=True)
+
             self.play(
                 TransformMatchingTex(my105, final_my105, key_map={"105": r"100"})
             )
@@ -1121,8 +1147,6 @@ def _(
                 dashed_line.opacity = 0.7
 
                 return dashed_line
-
-            self.next_section()
 
             many_lines = [my_dashed_line(ix) for ix in [90, 95, 100, 110]]
             self.play(
